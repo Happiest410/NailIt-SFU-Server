@@ -4,6 +4,9 @@
   "description": "NailIt Mediasoup WebRTC SFU Server with Gemini Live AI",
   "type": "module",
   "main": "src/index.ts",
+  "engines": {
+    "node": ">=18.0.0 <=22.x"
+  },
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx src/index.ts",
