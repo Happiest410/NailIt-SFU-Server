@@ -1,0 +1,91 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+
+}
+
+model Meet{
+    id  Int @id @default(autoincrement())
+    room String @unique
+}
+model Interviewer {
+  id           Int           @id @default(autoincrement())
+  username     String        @unique
+  passwordHash String
+  recruitments Recruitment[]
+  schedules    Schedule[]
+}
+
+model Candidate {
+  id           Int    @id @default(autoincrement())
+  username     String @unique
+  passwordHash String
+}
+
+model Recruitment {
+  id            Int           @id @default(autoincrement())
+  name          String
+  domain        String
+  formLink      String        @default("")
+  interviewerId Int
+  interviewer   Interviewer   @relation(fields: [interviewerId], references: [id], onDelete: Cascade)
+  applications  Application[]
+  schedules     Schedule[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Application {
+  id                   Int                   @id @default(autoincrement())
+  recruitmentId        Int
+  recruitment          Recruitment           @relation(fields: [recruitmentId], references: [id], onDelete: Cascade)
+  firstName            String
+  lastName             String
+  email                String
+  linkedin             String?
+  github               String?
+  resumeUrl            String?
+  candidateCredentials CandidateCredential[]
+  createdAt            DateTime              @default(now())
+}
+
+model Schedule {
+  id                   Int                   @id @default(autoincrement())
+  interviewerId        Int
+  interviewer          Interviewer           @relation(fields: [interviewerId], references: [id], onDelete: Cascade)
+  recruitmentId        Int
+  recruitment          Recruitment           @relation(fields: [recruitmentId], references: [id], onDelete: Cascade)
+  meetRoom             String                @unique
+  startTime            DateTime
+  endTime              DateTime
+  status               String                @default("SCHEDULED")
+  isStarted            Boolean               @default(false)
+  candidateCredentials CandidateCredential[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+}
+
+model CandidateCredential {
+  id              Int         @id @default(autoincrement())
+  applicationId   Int
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  scheduleId      Int
+  schedule        Schedule    @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  username        String      @unique
+  passwordHash    String
+  tempPassword    String
+  candidateUserId String      @unique
+  emailSent       Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+}
