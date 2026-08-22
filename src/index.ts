@@ -29,20 +29,13 @@ const resampler = await create(
 
 import { createWorker } from "mediasoup";
 import type { types } from "mediasoup";
+import createGeminiSession from "./gemini.ts";
 
 const opusEncoderAI = createOpusEncoder(48000, 2);
 
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3001";
-
 const app: Application = express();
 app.use(cors({
-    origin: (origin, callback) => {
-      if (!origin || origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1") || origin === FRONTEND_URL) {
-        callback(null, true);
-      } else {
-        callback(null, true);
-      }
-    },
+    origin: true,
     credentials: true
 }));
 app.use(express.json());
@@ -63,9 +56,10 @@ app.get("/meet", async (req: Request, res: Response) => {
   try {
     const meetId = generateMeetingCode();
     await prisma.meet.create({ data: { room: meetId } });
+    return res.status(200).json({ room: meetId });
   } catch (err) {
     console.error("Error creating meeting:", err);
-    res.status(500).json({ error: "Failed to create meeting" });
+    return res.status(500).json({ error: "Failed to create meeting" });
   }
 });
 
@@ -73,9 +67,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: (origin, callback) => {
-      callback(null, true);
-    },
+    origin: true,
     credentials: true
   }
 });
