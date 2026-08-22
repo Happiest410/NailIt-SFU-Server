@@ -47,7 +47,8 @@ export async function handleStartInterview(
     throw new Error("Audio producer not found");
   }
 
-  const AiConsumer = await room.router.consume({
+  // Consume candidate audio via PlainTransport
+  const AiConsumer = await AiInputTransport.consume({
     producerId: audioProducer.id,
     rtpCapabilities: room.router.rtpCapabilities,
     paused: false
@@ -69,8 +70,8 @@ export async function handleStartInterview(
     comedia: false
   });
 
-  const aiOutputProducer = await room.createProducer(participant, {
-    transportId: aiOutputTransport.id,
+  // Produce AI audio via PlainTransport
+  const aiOutputProducer = await aiOutputTransport.produce({
     kind: "audio",
     rtpParameters: {
       codecs: [
@@ -85,6 +86,8 @@ export async function handleStartInterview(
     },
     appData: {}
   });
+
+  mediaBridge.outputProducer = aiOutputProducer;
 
   const aiOutputSocket = dgram.createSocket("udp4");
   const aiOutputPort = aiOutputTransport.tuple.localPort;
@@ -110,6 +113,15 @@ export async function handleStartInterview(
   const interview = new Interview(room, aiInterviewer);
   room.interview = interview;
 
-  console.log("AI Interview started successfully!");
+  // Broadcast AI virtual participant to all connected room clients
+  const aiParticipant = {
+    id: "ai",
+    name: "AI Interviewer",
+    role: "ai",
+    producerIds: { audio: aiOutputProducer.id }
+  };
+  room.broadcastParticipantJoined(aiParticipant);
+
+  console.log("AI Interview started successfully! AI Producer ID:", aiOutputProducer.id);
   return { success: true };
 }
