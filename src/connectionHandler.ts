@@ -195,7 +195,7 @@ export async function handleConnection(
     socket.on("startInterview", async (data, callback) => {
       try {
         console.log("Starting AI Interview for room:", room.meetId);
-        await handleStartInterview(socket, room, resampler, opusEncoderAI);
+        await handleStartInterview(socket, data || { meetId: room.meetId }, room, resampler, opusEncoderAI);
         if (typeof callback === "function") callback({ success: true });
       } catch (e: any) {
         console.error("Error starting AI interview:", e);
@@ -206,7 +206,7 @@ export async function handleConnection(
     socket.on("start-interview", async (data, callback) => {
       try {
         console.log("Starting AI Interview for room:", room.meetId);
-        await handleStartInterview(socket, room, resampler, opusEncoderAI);
+        await handleStartInterview(socket, data || { meetId: room.meetId }, room, resampler, opusEncoderAI);
         if (typeof callback === "function") callback({ success: true });
       } catch (e: any) {
         console.error("Error starting AI interview:", e);
