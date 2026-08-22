@@ -81,6 +81,10 @@ export async function handleConnection(
     room.addParticipant(participant);
 
     console.log("Connection handled for", username, "role:", role);
+
+    // Emit ready signal to unblock client connection promise
+    socket.emit("ready", { role });
+
     return room;
   } catch (err) {
     console.error("Error in handleConnection:", err);
