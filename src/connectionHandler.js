@@ -192,6 +192,19 @@ export async function handleConnection(
       }
     });
 
+    socket.on("resumeConsumer", async ({ consumerId }, callback) => {
+      try {
+        const p = room.participants.get(user.id) || participant;
+        const consumer = p.consumers.get(consumerId);
+        if (consumer) {
+          await consumer.resume();
+        }
+        if (typeof callback === "function") callback({ resumed: true });
+      } catch (e: any) {
+        if (typeof callback === "function") callback({ error: e.message });
+      }
+    });
+
     socket.on("startInterview", async (data, callback) => {
       try {
         console.log("Starting AI Interview for room:", room.meetId);

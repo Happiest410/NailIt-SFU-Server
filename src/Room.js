@@ -166,6 +166,9 @@ export class Room {
             rtpCapabilities: this.router.rtpCapabilities,
             paused: false
         });
+
+        await consumer.resume();
+
         participant.consumers.set(consumer.id, consumer);
         return consumer;
     }
