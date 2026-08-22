@@ -13,30 +13,31 @@ export interface SerializedParticipant {
     };
 }
 
-interface createProducerParam{
-    transportId:string,
-    kind:types.MediaKind,
-    rtpParameters:types.RtpParameters,
-    appData:types.AppData
+interface createProducerParam {
+    transportId: string;
+    kind: types.MediaKind;
+    rtpParameters: types.RtpParameters;
+    appData: types.AppData;
 }
-interface createConsumerParams{
-   producerId:string,
-   transport:types.Transport
+
+interface createConsumerParams {
+    producerId: string;
+    transport: types.Transport;
 }
-export class Room{
-    public readonly meetId:string
+
+export class Room {
+    public readonly meetId: string;
     public readonly participants: Map<string, Participant> = new Map();
-    // private reaon
     public router: types.Router;
     public interview?: Interview;
 
-    constructor(meetID:string,router:types.Router){
-       this.meetId=meetID
-       this.router=router
+    constructor(meetID: string, router: types.Router) {
+        this.meetId = meetID;
+        this.router = router;
     }
 
-    addParticipant(participant:Participant){
-    this.participants.set(participant.user.id,participant)
+    addParticipant(participant: Participant) {
+        this.participants.set(participant.user.id, participant);
     }
 
     removeParticipant(userId: string) {
@@ -68,7 +69,7 @@ export class Room{
 
     private getAIVirtualParticipant(): SerializedParticipant | null {
         if (!this.interview) return null;
-        const aiProducerId = this.interview.AiIntevriewer.mediaBridge.outputProducer?.id;
+        const aiProducerId = (this.interview as any).AiIntevriewer?.mediaBridge?.outputProducer?.id;
         if (!aiProducerId) return null;
         return {
             id: "ai",
@@ -84,14 +85,12 @@ export class Room{
         const result: SerializedParticipant[] = [];
 
         for (const participant of this.participants.values()) {
-            // Candidates should NOT see Interviewers
             if (forRole === "Candidate" && participant.role === "Interviewer") {
                 continue;
             }
             result.push(this.serializeParticipant(participant));
         }
 
-        // Add the AI virtual participant if an interview is running
         const ai = this.getAIVirtualParticipant();
         if (ai) {
             result.push(ai);
@@ -100,106 +99,82 @@ export class Room{
         return result;
     }
 
-    /**
-     * Broadcasts a participantJoined event respecting visibility rules:
-     * - If a candidate joins → only notify interviewers
-     * - If an interviewer joins → don't notify anyone (hidden)
-     * - If AI joins → notify everyone (candidates + interviewers)
-     */
     broadcastParticipantJoined(participant: SerializedParticipant) {
         for (const p of this.participants.values()) {
-            // Don't notify the joining participant about themselves
             if (p.user.id === participant.id) continue;
-
-            if (participant.role === "Interviewer") {
-                // Interviewers are hidden — don't broadcast to anyone
-                continue;
-            }
-
-            if (participant.role === "Candidate" && p.role === "Candidate") {
-                // Candidates don't need to know about other candidates joining
-                // (in this 1:1 interview model)
-                continue;
-            }
-
-            // AI participant or candidate joining → notify interviewers
-            // AI participant joining → also notify candidates
-            if (participant.role === "ai" || p.role === "Interviewer") {
-                p.socket.emit("participantJoined", participant);
-            }
+            if (participant.role === "Interviewer") continue;
+            if (participant.role === "Candidate" && p.role === "Candidate") continue;
+            p.socket.emit("participantJoined", participant);
         }
     }
 
     broadcastParticipantLeft(participantId: string, participantRole: string) {
         for (const p of this.participants.values()) {
             if (p.user.id === participantId) continue;
-
-            // If an interviewer left, candidates shouldn't know
-            if (participantRole === "Interviewer" && p.role === "Candidate") {
-                continue;
-            }
-
+            if (participantRole === "Interviewer" && p.role === "Candidate") continue;
             p.socket.emit("participantLeft", { id: participantId });
         }
     }
-    
-    async createWebRtcTransport(participant:Participant){
+
+    async createWebRtcTransport(participant: Participant) {
         const transport = await this.router.createWebRtcTransport({
-    listenInfos: [
-      { protocol: "udp", ip: "0.0.0.0", announcedAddress: ANNOUNCED_IP },
-      { protocol: "tcp", ip: "0.0.0.0", announcedAddress: ANNOUNCED_IP },
-    ],
-    enableUdp: true,
-    enableTcp: true,
-    preferUdp: true,
-  });
+            listenInfos: [
+                { protocol: "udp", ip: "0.0.0.0", announcedAddress: ANNOUNCED_IP },
+                { protocol: "tcp", ip: "0.0.0.0", announcedAddress: ANNOUNCED_IP },
+            ],
+            enableUdp: true,
+            enableTcp: true,
+            preferUdp: true,
+        });
 
-  transport.on("dtlsstatechange", (state) => {
-    console.log(`[Transport ${transport.id}] DTLS state:`, state);
-  });
-  transport.on("icestatechange", (state) => {
-    console.log(`[Transport ${transport.id}] ICE state:`, state);
-  });
+        transport.on("dtlsstatechange", (state) => {
+            console.log(`[Transport ${transport.id}] DTLS state:`, state);
+        });
+        transport.on("icestatechange", (state) => {
+            console.log(`[Transport ${transport.id}] ICE state:`, state);
+        });
 
-  participant.transports.set(transport.id,transport)
-
-  return transport
-  
+        participant.transports.set(transport.id, transport);
+        return transport;
     }
-    async createProducer(participant:Participant,params:createProducerParam){
-        const transport = participant.transports.get(params.transportId);
+
+    async createProducer(participant: Participant, params: createProducerParam) {
+        let transport = participant.transports.get(params.transportId);
         if (!transport) {
-    throw new Error("Transport not found");
+            for (const p of this.participants.values()) {
+                if (p.transports.has(params.transportId)) {
+                    transport = p.transports.get(params.transportId);
+                    break;
+                }
+            }
+        }
+        if (!transport) {
+            throw new Error("Transport not found");
+        }
+        const producer = await transport.produce({ kind: params.kind, rtpParameters: params.rtpParameters, appData: params.appData });
+        participant.producers.set(producer.id, producer);
+        return producer;
     }
-        const producer = await transport.produce({ kind:params.kind, rtpParameters:params.rtpParameters, appData:params.appData });
-        participant.producers.set(producer.id,producer)
 
-        return producer
-    }
-    async createConsumer(participant:Participant,params:createConsumerParams){
-         const transport = params.transport
-           if (!transport) {
-    throw new Error("Transport not found");
-    }
-    const consumer = await transport.consume({
-        producerId: params.producerId,
-        rtpCapabilities: this.router.rtpCapabilities
-      });
-
-         participant.consumers.set(consumer.id,consumer)
-
-         return consumer
-
+    async createConsumer(participant: Participant, params: createConsumerParams) {
+        const transport = params.transport;
+        if (!transport) {
+            throw new Error("Transport not found");
+        }
+        const consumer = await transport.consume({
+            producerId: params.producerId,
+            rtpCapabilities: this.router.rtpCapabilities,
+            paused: false
+        });
+        participant.consumers.set(consumer.id, consumer);
+        return consumer;
     }
 
     async createPlainTransport() {
-        return await this.router.createPlainTransport(
-            {
-      listenInfo: { protocol: "udp", ip: "127.0.0.1" },
-      rtcpMux: true,
-      comedia: false
-    }
-  
-        );
+        return await this.router.createPlainTransport({
+            listenInfo: { protocol: "udp", ip: "127.0.0.1" },
+            rtcpMux: true,
+            comedia: false
+        });
     }
 }
