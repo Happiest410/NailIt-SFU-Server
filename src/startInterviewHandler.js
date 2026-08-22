@@ -52,6 +52,9 @@ export async function handleStartInterview(
     rtpCapabilities: room.router.rtpCapabilities,
   });
 
+  // Explicitly resume candidate audio consumer so RTP packets reach IncomingAudioPipeline
+  await aiConsumer.resume();
+
   const aiOutputTransport = await room.router.createPlainTransport({
     listenInfo: { protocol: "udp", ip: "127.0.0.1" },
     rtcpMux: true,
