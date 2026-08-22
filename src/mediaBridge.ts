@@ -55,19 +55,24 @@ export class MediaBridge {
         this.candidateAudioPayloadType = payloadType;
     }
 
-    async resampleAndStereo(pcm24kMono: Buffer, resampler: any): Promise<Buffer> {
-        const inputArray = new Float32Array(pcm24kMono.length / 2);
-        for (let i = 0; i < inputArray.length; i++) {
-            inputArray[i] = pcm24kMono.readInt16LE(i * 2) / 32768;
-        }
+    // Pure JS 24kHz Mono -> 48kHz Stereo 16-bit PCM Linear Interpolator
+    resampleAndStereo(pcm24kMono: Buffer): Buffer {
+        const numSamples = Math.floor(pcm24kMono.length / 2);
+        const stereoBuffer = Buffer.alloc(numSamples * 8);
 
-        const outputArray = await resampler.simple(inputArray);
+        for (let i = 0; i < numSamples; i++) {
+            const sample1 = pcm24kMono.readInt16LE(i * 2);
+            const sample2 = (i < numSamples - 1) 
+                ? Math.round((sample1 + pcm24kMono.readInt16LE((i + 1) * 2)) / 2) 
+                : sample1;
 
-        const stereoBuffer = Buffer.alloc(outputArray.length * 4);
-        for (let i = 0; i < outputArray.length; i++) {
-            const sample = Math.max(-32768, Math.min(32767, Math.round(outputArray[i] * 32768)));
-            stereoBuffer.writeInt16LE(sample, i * 4);
-            stereoBuffer.writeInt16LE(sample, i * 4 + 2);
+            const outIdx = i * 8;
+            // Frame 1 (Left & Right)
+            stereoBuffer.writeInt16LE(sample1, outIdx);
+            stereoBuffer.writeInt16LE(sample1, outIdx + 2);
+            // Frame 2 (Left & Right)
+            stereoBuffer.writeInt16LE(sample2, outIdx + 4);
+            stereoBuffer.writeInt16LE(sample2, outIdx + 6);
         }
 
         return stereoBuffer;
@@ -116,7 +121,7 @@ export class MediaBridge {
 
     enqueueGeminiAudioChunk(pcm24kMono: Buffer): Promise<void> {
         this.processingChain = this.processingChain.then(async () => {
-            const pcm48kStereo = await this.resampleAndStereo(pcm24kMono, this.resampler);
+            const pcm48kStereo = this.resampleAndStereo(pcm24kMono);
             this.aiSpeaking = true;
 
             const combined = Buffer.concat([this.leftoverPCM, pcm48kStereo]);
