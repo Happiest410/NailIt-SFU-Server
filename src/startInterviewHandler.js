@@ -26,10 +26,11 @@ export async function handleStartInterview(
     throw new Error("Invalid room or router not initialized");
   }
 
+  // Create input PlainTransport with comedia: true (auto-detects incoming UDP packets, no manual connect port needed)
   const AiInputTransport = await room.router.createPlainTransport({
     listenInfo: { protocol: "udp", ip: "127.0.0.1" },
     rtcpMux: true,
-    comedia: false
+    comedia: true
   });
 
   const userId = socket.data.user?.id || socket.id;
@@ -54,15 +55,7 @@ export async function handleStartInterview(
     paused: false
   });
 
-  const mediaBridge = new MediaBridge();
   await AiConsumer.resume();
-
-  await AiInputTransport.connect({
-    ip: "127.0.0.1",
-    port: mediaBridge.udpPort,
-  });
-
-  await AiConsumer.requestKeyFrame();
 
   const aiOutputTransport = await room.router.createPlainTransport({
     listenInfo: { protocol: "udp", ip: "127.0.0.1" },
@@ -87,10 +80,18 @@ export async function handleStartInterview(
     appData: {}
   });
 
-  mediaBridge.outputProducer = aiOutputProducer;
-
   const aiOutputSocket = dgram.createSocket("udp4");
   const aiOutputPort = aiOutputTransport.tuple.localPort;
+
+  const mediaBridge = new MediaBridge(
+    resampler,
+    opusEncoderAI,
+    aiOutputSocket,
+    AiInputTransport,
+    aiOutputTransport,
+    aiOutputProducer,
+    AiConsumer
+  );
 
   const geminiProvider = new GeminiProvider();
 
@@ -108,7 +109,8 @@ export async function handleStartInterview(
   await aiInterviewer.init();
 
   const incomingPipeline = new IncomingAudioPipeline(mediaBridge, aiInterviewer);
-  await incomingPipeline.startPipeline(mediaBridge.udpPort);
+  const inputPort = AiInputTransport.tuple.localPort;
+  await incomingPipeline.startPipeline(inputPort);
 
   const interview = new Interview(room, aiInterviewer);
   room.interview = interview;
