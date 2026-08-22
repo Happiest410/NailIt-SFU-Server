@@ -83,7 +83,15 @@ export async function handleConnection(
 
     console.log("Connection handled for", username, "role:", role);
 
-    // Register WebRTC Socket Handlers for this client connection
+    // Register WebRTC & Room Socket Handlers
+    socket.on("getParticipants", (_dataOrCallback: any, maybeCallback?: any) => {
+      const callback = typeof _dataOrCallback === "function" ? _dataOrCallback : maybeCallback;
+      if (typeof callback === "function") {
+        const r = socket.data.user?.role || "Candidate";
+        callback(room.getVisibleParticipants(r));
+      }
+    });
+
     socket.on("getRtpCapabilities", (_dataOrCallback: any, maybeCallback?: any) => {
       console.log("Received getRtpCapabilities request from", username);
       const callback = typeof _dataOrCallback === "function" ? _dataOrCallback : maybeCallback;
@@ -184,8 +192,26 @@ export async function handleConnection(
       }
     });
 
-    socket.on("start-interview", async (data) => {
-      await handleStartInterview(socket, room, resampler, opusEncoderAI);
+    socket.on("startInterview", async (data, callback) => {
+      try {
+        console.log("Starting AI Interview for room:", room.meetId);
+        await handleStartInterview(socket, room, resampler, opusEncoderAI);
+        if (typeof callback === "function") callback({ success: true });
+      } catch (e: any) {
+        console.error("Error starting AI interview:", e);
+        if (typeof callback === "function") callback({ error: e.message || "Failed to start interview" });
+      }
+    });
+
+    socket.on("start-interview", async (data, callback) => {
+      try {
+        console.log("Starting AI Interview for room:", room.meetId);
+        await handleStartInterview(socket, room, resampler, opusEncoderAI);
+        if (typeof callback === "function") callback({ success: true });
+      } catch (e: any) {
+        console.error("Error starting AI interview:", e);
+        if (typeof callback === "function") callback({ error: e.message || "Failed to start interview" });
+      }
     });
 
     socket.on("disconnect", () => {
