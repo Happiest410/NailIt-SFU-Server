@@ -1,17 +1,12 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY!
-});
-
-
-
 export default async function createGeminiSession(
   onAudioChunk: (pcmBuffer: Buffer) => void,
-    onUserSpeech: () => void
+  onUserSpeech: () => void
 ) {
-  
-  
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || process.env.GOOGLE_API_KEY || "";
+  const ai = new GoogleGenAI({ apiKey });
+
   let resolveOpen: () => void;
   const openPromise = new Promise<void>((resolve) => {
     resolveOpen = resolve;
@@ -23,11 +18,8 @@ export default async function createGeminiSession(
       responseModalities: [Modality.AUDIO],
       inputAudioTranscription: {},
       outputAudioTranscription: {},
-             systemInstruction:
-      
-           `
+      systemInstruction: `
 You are an AI interviewer.
-
 Your responsibilities:
 - Begin the interview immediately after the session starts.
 - Introduce yourself briefly.
@@ -38,10 +30,6 @@ Your responsibilities:
 - Wait for the candidate's response before continuing.
 `
     },
-
-        
-   
-    
     callbacks: {
       onopen() {
         console.log("Gemini connected");
@@ -63,8 +51,6 @@ Your responsibilities:
           for (const part of content.modelTurn.parts) {
             if (part.inlineData?.data) {
               const pcmBuffer = Buffer.from(part.inlineData.data, "base64");
-              console.log("Gemini chunk size (raw base64 bytes):", pcmBuffer.length);
-
               onAudioChunk(pcmBuffer);
             }
           }
@@ -81,27 +67,14 @@ Your responsibilities:
 
   await openPromise;
   await session.sendClientContent({
-  turns: [
-    {
-      role: "user",
-      parts: [
-        {
-          text: "The candidate has entered the interview room."
-        }
-      ]
-    }
-  ],
-  turnComplete: true,
-});
-  console.log(
-  "SESSION METHODS:",
-  Object.getOwnPropertyNames(
-    Object.getPrototypeOf(session)
-  )
-);
-
-console.log("SESSION:", session);
-  console.log("Gemini session ready for realtime input");
+    turns: [
+      {
+        role: "user",
+        parts: [{ text: "The candidate has entered the interview room." }]
+      }
+    ],
+    turnComplete: true,
+  });
 
   return session;
 }
