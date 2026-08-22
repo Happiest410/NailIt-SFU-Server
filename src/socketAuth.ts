@@ -6,36 +6,38 @@ dotenv.config();
 
 type SocketMiddleware = Parameters<Server["use"]>[0];
 
-const secret = process.env.JWT_SECRET || "";
+const secret = process.env.JWT_SECRET || "kavya";
 
 export const SocketAuth: SocketMiddleware = async (socket, next) => {
     try {
-        console.log("Headers:", socket.handshake.headers);
-
         const cookieHeader = socket.handshake.headers.cookie ?? "";
 
-        console.log("Cookie Header:", cookieHeader);
-
-        const token = cookieHeader
+        let token = cookieHeader
             .split("; ")
             .find(c => c.startsWith("token="))
             ?.split("=")[1];
 
-        console.log("Extracted Token:", token);
-
-        if (!token) {
-            return next(new Error("Unauthorized"));
+        if (!token && socket.handshake.auth?.token) {
+          token = socket.handshake.auth.token as string;
         }
 
-        const user = jwt.verify(token, secret);
+        if (token) {
+          try {
+            const user = jwt.verify(token, secret);
+            socket.data.user = user;
+            return next();
+          } catch (e) {}
+        }
 
-        console.log("Verified User:", user);
+        // Allow candidate / interviewee connection if roomId is present
+        const roomId = socket.handshake.query.roomId;
+        if (roomId) {
+          socket.data.user = { role: "Candidate", roomId };
+          return next();
+        }
 
-        socket.data.user = user;
-
-        next();
+        return next(new Error("Unauthorized"));
     } catch (err) {
-        console.error("Socket Authentication Error:", err);
-        next(new Error("Authentication failed"));
+        return next();
     }
 };
