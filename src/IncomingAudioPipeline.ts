@@ -1,7 +1,7 @@
 import { JitterBuffer } from "./AudioProcessing.ts";
 import dgram from "dgram";
 import { MediaBridge } from "./mediaBridge.ts";
-import opus from "@discordjs/opus";
+import opus from "opusscript";
 import { parseRTPPacket } from "./AudioProcessing.ts";
 import { isRTCP } from "./AudioProcessing.ts";
 import { getRMS } from "./AudioProcessing.ts";

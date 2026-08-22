@@ -29,7 +29,7 @@ const resampler= await create(
 
 import { createWorker } from "mediasoup";
 import type { types } from "mediasoup";
-import opus from "@discordjs/opus";
+import opus from "opusscript";
 import createGeminiSession from "./gemini.ts";
 
 
