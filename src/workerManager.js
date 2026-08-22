@@ -7,13 +7,15 @@ export class WorkerManager {
     async initialize(): Promise<void> {
         this.worker = await createWorker({
             rtcMinPort: 40000,
-            rtcMaxPort: 49999,
+            rtcMaxPort: 40019,
         });
 
         this.worker.on("died", () => {
             console.error("Mediasoup worker died");
             process.exit(1);
         });
+
+        console.log("Mediasoup worker initialized (ports 40000-40019)");
     }
 
     getWorker(): types.Worker {

@@ -2,21 +2,10 @@ import { Participant } from "./participant.ts";
 import { Interview } from "./interview.ts";
 import { AIInterviewer } from "./AiInterviewer.ts";
 import type { types } from "mediasoup";
-import dns from "dns";
 
-let ANNOUNCED_IP = process.env.ANNOUNCED_IP || process.env.PUBLIC_IP || process.env.RAILWAY_PUBLIC_DOMAIN || "nailit-sfu-server-production.up.railway.app";
-
-// Resolve domain hostname to IPv4 address if a domain name string is provided
-if (ANNOUNCED_IP && !/^\d+\.\d+\.\d+\.\d+$/.test(ANNOUNCED_IP)) {
-    dns.lookup(ANNOUNCED_IP, (err, address) => {
-        if (!err && address) {
-            console.log(`Resolved ANNOUNCED_IP domain [${ANNOUNCED_IP}] -> IPv4:`, address);
-            ANNOUNCED_IP = address;
-        } else {
-            console.warn("DNS lookup failed for ANNOUNCED_IP domain:", ANNOUNCED_IP, err?.message);
-        }
-    });
-}
+// Fly.io injects FLY_PUBLIC_IP with the VM's public IPv4 address
+const ANNOUNCED_IP = process.env.ANNOUNCED_IP || process.env.FLY_PUBLIC_IP || process.env.PUBLIC_IP || "127.0.0.1";
+console.log("WebRTC ANNOUNCED_IP:", ANNOUNCED_IP);
 
 export interface SerializedParticipant {
     id: string;
@@ -131,11 +120,10 @@ export class Room {
     }
 
     async createWebRtcTransport(participant: Participant) {
-        const publicAddress = process.env.ANNOUNCED_IP || process.env.PUBLIC_IP || ANNOUNCED_IP || "127.0.0.1";
         const transport = await this.router.createWebRtcTransport({
             listenInfos: [
-                { protocol: "udp", ip: "0.0.0.0", announcedAddress: publicAddress },
-                { protocol: "tcp", ip: "0.0.0.0", announcedAddress: publicAddress },
+                { protocol: "udp", ip: "0.0.0.0", announcedAddress: ANNOUNCED_IP },
+                { protocol: "tcp", ip: "0.0.0.0", announcedAddress: ANNOUNCED_IP },
             ],
             enableUdp: true,
             enableTcp: true,

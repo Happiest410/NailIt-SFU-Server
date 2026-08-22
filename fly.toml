@@ -1,0 +1,147 @@
+# fly.toml — Fly.io configuration for NailIt SFU Server
+# Mediasoup requires UDP ports for WebRTC media transport
+
+app = "nailit-sfu-server"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+  UDP_SERVER_IP = "127.0.0.1"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+# Mediasoup WebRTC UDP ports (40000-40019)
+# Each interview needs ~4 ports, so 20 ports = ~5 concurrent interviews
+[[services]]
+  protocol = "udp"
+  internal_port = 40000
+  [[services.ports]]
+    port = 40000
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40001
+  [[services.ports]]
+    port = 40001
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40002
+  [[services.ports]]
+    port = 40002
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40003
+  [[services.ports]]
+    port = 40003
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40004
+  [[services.ports]]
+    port = 40004
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40005
+  [[services.ports]]
+    port = 40005
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40006
+  [[services.ports]]
+    port = 40006
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40007
+  [[services.ports]]
+    port = 40007
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40008
+  [[services.ports]]
+    port = 40008
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40009
+  [[services.ports]]
+    port = 40009
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40010
+  [[services.ports]]
+    port = 40010
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40011
+  [[services.ports]]
+    port = 40011
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40012
+  [[services.ports]]
+    port = 40012
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40013
+  [[services.ports]]
+    port = 40013
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40014
+  [[services.ports]]
+    port = 40014
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40015
+  [[services.ports]]
+    port = 40015
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40016
+  [[services.ports]]
+    port = 40016
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40017
+  [[services.ports]]
+    port = 40017
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40018
+  [[services.ports]]
+    port = 40018
+
+[[services]]
+  protocol = "udp"
+  internal_port = 40019
+  [[services.ports]]
+    port = 40019
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
