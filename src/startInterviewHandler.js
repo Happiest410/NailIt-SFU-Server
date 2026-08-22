@@ -26,11 +26,10 @@ export async function handleStartInterview(
     throw new Error("Invalid room or router not initialized");
   }
 
-  // Create input PlainTransport with comedia: true (auto-detects incoming UDP packets, no manual connect port needed)
   const AiInputTransport = await room.router.createPlainTransport({
     listenInfo: { protocol: "udp", ip: "127.0.0.1" },
     rtcpMux: true,
-    comedia: true
+    comedia: false
   });
 
   const userId = socket.data.user?.id || socket.id;
@@ -48,14 +47,10 @@ export async function handleStartInterview(
     throw new Error("Audio producer not found");
   }
 
-  // Consume candidate audio via PlainTransport
-  const AiConsumer = await AiInputTransport.consume({
+  const aiConsumer = await AiInputTransport.consume({
     producerId: audioProducer.id,
     rtpCapabilities: room.router.rtpCapabilities,
-    paused: false
   });
-
-  await AiConsumer.resume();
 
   const aiOutputTransport = await room.router.createPlainTransport({
     listenInfo: { protocol: "udp", ip: "127.0.0.1" },
@@ -63,57 +58,77 @@ export async function handleStartInterview(
     comedia: false
   });
 
-  // Produce AI audio via PlainTransport
   const aiOutputProducer = await aiOutputTransport.produce({
     kind: "audio",
     rtpParameters: {
       codecs: [
         {
           mimeType: "audio/opus",
+          payloadType: AI_PAYLOAD_TYPE,
           clockRate: 48000,
           channels: 2,
-          payloadType: AI_PAYLOAD_TYPE
+          parameters: {}
         }
       ],
       encodings: [{ ssrc: AI_SSRC }]
-    },
-    appData: {}
+    }
   });
 
-  const aiOutputSocket = dgram.createSocket("udp4");
-  const aiOutputPort = aiOutputTransport.tuple.localPort;
+  aiOutputProducer.on("score", (score) => {
+    console.log("Producer score:", score);
+  });
+
+  aiOutputProducer.on("trace", (trace) => {
+    console.log("Producer trace:", trace);
+  });
+
+  const rtpSendSocket = dgram.createSocket("udp4");
+
+  await new Promise<void>((resolve, reject) => {
+    rtpSendSocket.bind(0, (err?: Error) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+
+  const senderAddress = rtpSendSocket.address();
+
+  if (typeof senderAddress === "string") {
+    throw new Error("Unexpected UNIX socket");
+  }
+
+  await aiOutputTransport.connect({
+    ip: "127.0.0.1",
+    port: senderAddress.port
+  });
+
+  console.log("Output transport:", aiOutputTransport.tuple);
 
   const mediaBridge = new MediaBridge(
     resampler,
     opusEncoderAI,
-    aiOutputSocket,
+    rtpSendSocket,
     AiInputTransport,
     aiOutputTransport,
     aiOutputProducer,
-    AiConsumer
+    aiConsumer
   );
 
-  const geminiProvider = new GeminiProvider();
+  const AiInterviewerInstance = new AIInterviewer(mediaBridge);
+  const interview: Interview = new Interview(AiInterviewerInstance);
 
-  const aiInterviewer = new AIInterviewer(
-    mediaBridge,
-    aiOutputSocket,
-    aiOutputPort,
-    AI_SSRC,
-    AI_PAYLOAD_TYPE,
-    resampler,
-    opusEncoderAI,
-    geminiProvider
-  );
-
-  await aiInterviewer.init();
-
-  const incomingPipeline = new IncomingAudioPipeline(mediaBridge, aiInterviewer);
-  const inputPort = AiInputTransport.tuple.localPort;
-  await incomingPipeline.startPipeline(inputPort);
-
-  const interview = new Interview(room, aiInterviewer);
   room.interview = interview;
+
+  console.log("Connecting to Gemini Live API...");
+  await AiInterviewerInstance.provider.connect();
+  await AiInterviewerInstance.provider.startConversation("client has entered");
+
+  const incomingAudioPipeline = new IncomingAudioPipeline(mediaBridge, AiInterviewerInstance);
+
+  const port = await incomingAudioPipeline.start();
+
+  const udpIp = process.env.UDP_SERVER_IP || "127.0.0.1";
+  await AiInputTransport.connect({ ip: udpIp, port });
 
   // Broadcast AI virtual participant to all connected room clients
   const aiParticipant = {
